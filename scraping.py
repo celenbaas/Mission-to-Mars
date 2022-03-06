@@ -1,171 +1,140 @@
-{
- "cells": [
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "92db54fb",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    " #Import Splinter, BeautifulSoup, and Pandas\n",
-    "from splinter import Browser\n",
-    "from bs4 import BeautifulSoup as soup\n",
-    "import pandas as pd\n",
-    "import datetime as dt\n",
-    "from webdriver_manager.chrome import ChromeDriverManager\n",
-    "\n",
-    "\n",
-    "def scrape_all():\n",
-    "    # Initiate headless driver for deployment\n",
-    "    executable_path = {'executable_path': ChromeDriverManager().install()}\n",
-    "    browser = Browser('chrome', **executable_path, headless=True)\n",
-    "\n",
-    "    news_title, news_paragraph = mars_news(browser)\n",
-    "\n",
-    "\n",
-    "    # Run all scraping functions and store results in a dictionary\n",
-    "    data = {\n",
-    "        \"news_title\": news_title,\n",
-    "        \"news_paragraph\": news_paragraph,\n",
-    "        \"featured_image\": featured_image(browser),\n",
-    "        \"facts\": mars_facts(),\n",
-    "        \"last_modified\": dt.datetime.now(),\n",
-    "        \"hemispheres\": mars_images(browser)\n",
-    "    }\n",
-    "\n",
-    "    # Stop webdriver and return data\n",
-    "    browser.quit()\n",
-    "    return data\n",
-    "\n",
-    "\n",
-    "def mars_news(browser):\n",
-    "\n",
-    "    # Scrape Mars News\n",
-    "    # Visit the mars nasa news site\n",
-    "    url = 'https://data-class-mars.s3.amazonaws.com/Mars/index.html'\n",
-    "    browser.visit(url)\n",
-    "\n",
-    "    # Optional delay for loading the page\n",
-    "    browser.is_element_present_by_css('div.list_text', wait_time=1)\n",
-    "\n",
-    "    # Convert the browser html to a soup object and then quit the browser\n",
-    "    html = browser.html\n",
-    "    news_soup = soup(html, 'html.parser')\n",
-    "\n",
-    "    # Add try/except for error handling\n",
-    "    try:\n",
-    "        slide_elem = news_soup.select_one('div.list_text')\n",
-    "        # Use the parent element to find the first 'a' tag and save it as 'news_title'\n",
-    "        news_title = slide_elem.find('div', class_='content_title').get_text()\n",
-    "        # Use the parent element to find the paragraph text\n",
-    "        news_p = slide_elem.find('div', class_='article_teaser_body').get_text()\n",
-    "\n",
-    "    except AttributeError:\n",
-    "        return None, None\n",
-    "\n",
-    "    return news_title, news_p\n",
-    "\n",
-    "\n",
-    "def featured_image(browser):\n",
-    "    # Visit URL\n",
-    "    url = 'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/index.html'\n",
-    "    browser.visit(url)\n",
-    "\n",
-    "    # Find and click the full image button\n",
-    "    full_image_elem = browser.find_by_tag('button')[1]\n",
-    "    full_image_elem.click()\n",
-    "\n",
-    "    # Parse the resulting html with soup\n",
-    "    html = browser.html\n",
-    "    img_soup = soup(html, 'html.parser')\n",
-    "\n",
-    "    # Add try/except for error handling\n",
-    "    try:\n",
-    "        # Find the relative image url\n",
-    "        img_url_rel = img_soup.find('img', class_='fancybox-image').get('src')\n",
-    "\n",
-    "    except AttributeError:\n",
-    "        return None\n",
-    "\n",
-    "    # Use the base url to create an absolute url\n",
-    "    img_url = f'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/{img_url_rel}'\n",
-    "\n",
-    "    return img_url\n",
-    "\n",
-    "def mars_facts():\n",
-    "    # Add try/except for error handling\n",
-    "    try:\n",
-    "        # Use 'read_html' to scrape the facts table into a dataframe\n",
-    "        df = pd.read_html('https://data-class-mars-facts.s3.amazonaws.com/Mars_Facts/index.html')[0]\n",
-    "\n",
-    "    except BaseException:\n",
-    "        return None\n",
-    "\n",
-    "    # Assign columns and set index of dataframe\n",
-    "    df.columns=['Description', 'Mars', 'Earth']\n",
-    "    df.set_index('Description', inplace=True)\n",
-    "\n",
-    "    # Convert dataframe into HTML format, add bootstrap\n",
-    "    return df.to_html(classes=\"table table-striped\")\n",
-    "\n",
-    "if __name__ == \"__main__\":\n",
-    "\n",
-    "    # If running as script, print scraped data\n",
-    "    print(scrape_all())\n",
-    "\n",
-    "def mars_images(browser):\n",
-    "    \n",
-    "\n",
-    "    url = 'https://marshemispheres.com/'\n",
-    "\n",
-    "    browser.visit(url)\n",
-    "\n",
-    "    # 2. Create a list to hold the images and titles.\n",
-    "    hemisphere_image_urls = []\n",
-    "\n",
-    "    # 3. Write code to retrieve the image urls and titles for each hemisphere.\n",
-    "    #Count how many items on the page have div.description a.itemLink.product-item h3\n",
-    "    hemisphere_links = browser.find_by_css('div.description a.itemLink.product-item h3')\n",
-    "\n",
-    "    #Iterate through each link that matches div.description a.itemLink.product-item h3\n",
-    "    for i in range(len(hemisphere_links)):\n",
-    "        hemispheres= {}\n",
-    "        \n",
-    "        #Click the link to visit the ith item\n",
-    "        browser.find_by_css('div.description a.itemLink.product-item h3')[i].click()\n",
-    "        \n",
-    "        #Gets the link for the image that has the Sample text\n",
-    "        img_url = browser.links.find_by_text('Sample')['href']\n",
-    "        \n",
-    "        #Gets the text for the css that has h2.title attribute\n",
-    "        title = browser.find_by_css('h2.title').text\n",
-    "        \n",
-    "        hemispheres[\"img_url\"] = img_url\n",
-    "        hemispheres[\"title\"] = title\n",
-    "        \n",
-    "        #Append dictionary to hemisphere_image_"
-   ]
-  }
- ],
- "metadata": {
-  "kernelspec": {
-   "display_name": "Python 3 (ipykernel)",
-   "language": "python",
-   "name": "python3"
-  },
-  "language_info": {
-   "codemirror_mode": {
-    "name": "ipython",
-    "version": 3
-   },
-   "file_extension": ".py",
-   "mimetype": "text/x-python",
-   "name": "python",
-   "nbconvert_exporter": "python",
-   "pygments_lexer": "ipython3",
-   "version": "3.7.11"
-  }
- },
- "nbformat": 4,
- "nbformat_minor": 5
-}
+#Import Splinter, BeautifulSoup, and Pandas
+from splinter import Browser
+from bs4 import BeautifulSoup as soup
+import pandas as pd
+import datetime as dt
+from webdriver_manager.chrome import ChromeDriverManager
+
+
+def scrape_all():
+   # Initiate headless driver for deployment
+   executable_path = {'executable_path': ChromeDriverManager().install()}
+   browser = Browser('chrome', **executable_path, headless=True)
+
+   news_title, news_paragraph = mars_news(browser)
+
+
+   # Run all scraping functions and store results in a dictionary
+   data = {
+       "news_title": news_title,
+       "news_paragraph": news_paragraph,
+       "featured_image": featured_image(browser),
+       "facts": mars_facts(),
+       "last_modified": dt.datetime.now(),
+       "hemispheres": mars_images(browser)
+   }
+
+   # Stop webdriver and return data
+   browser.quit()
+   return data
+
+
+def mars_news(browser):
+
+   # Scrape Mars News
+   # Visit the mars nasa news site
+   url = 'https://data-class-mars.s3.amazonaws.com/Mars/index.html'
+   browser.visit(url)
+
+   # Optional delay for loading the page
+   browser.is_element_present_by_css('div.list_text', wait_time=1)
+
+   # Convert the browser html to a soup object and then quit the browser
+   html = browser.html
+   news_soup = soup(html, 'html.parser')
+
+   # Add try/except for error handling
+   try:
+       slide_elem = news_soup.select_one('div.list_text')
+       # Use the parent element to find the first 'a' tag and save it as 'news_title'
+       news_title = slide_elem.find('div', class_='content_title').get_text()
+       # Use the parent element to find the paragraph text
+       news_p = slide_elem.find('div', class_='article_teaser_body').get_text()
+
+   except AttributeError:
+       return None, None
+
+   return news_title, news_p
+
+
+def featured_image(browser):
+   # Visit URL
+   url = 'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/index.html'
+   browser.visit(url)
+
+   # Find and click the full image button
+   full_image_elem = browser.find_by_tag('button')[1]
+   full_image_elem.click()
+
+   # Parse the resulting html with soup
+   html = browser.html
+   img_soup = soup(html, 'html.parser')
+
+   # Add try/except for error handling
+   try:
+       # Find the relative image url
+       img_url_rel = img_soup.find('img', class_='fancybox-image').get('src')
+
+   except AttributeError:
+       return None
+
+   # Use the base url to create an absolute url
+   img_url = f'https://data-class-jpl-space.s3.amazonaws.com/JPL_Space/{img_url_rel}'
+
+   return img_url
+
+def mars_facts():
+   # Add try/except for error handling
+   try:
+       # Use 'read_html' to scrape the facts table into a dataframe
+       df = pd.read_html('https://data-class-mars-facts.s3.amazonaws.com/Mars_Facts/index.html')[0]
+
+   except BaseException:
+       return None
+
+   # Assign columns and set index of dataframe
+   df.columns=['Description', 'Mars', 'Earth']
+   df.set_index('Description', inplace=True)
+
+   # Convert dataframe into HTML format, add bootstrap
+   return df.to_html(classes="table table-striped")
+
+if __name__ == "__main__":
+
+   # If running as script, print scraped data
+   print(scrape_all())
+
+def mars_images(browser):
+   
+
+   url = 'https://marshemispheres.com/'
+
+   browser.visit(url)
+
+   # 2. Create a list to hold the images and titles.
+   hemisphere_image_urls = []
+
+   # 3. Write code to retrieve the image urls and titles for each hemisphere.
+   #Count how many items on the page have div.description a.itemLink.product-item h3
+   hemisphere_links = browser.find_by_css('div.description a.itemLink.product-item h3')
+
+   #Iterate through each link that matches div.description a.itemLink.product-item h3
+   for i in range(len(hemisphere_links)):
+       hemispheres= {}
+       
+       #Click the link to visit the ith item
+       browser.find_by_css('div.description a.itemLink.product-item h3')[i].click()
+       
+       #Gets the link for the image that has the Sample text
+       img_url = browser.links.find_by_text('Sample')['href']
+       
+       #Gets the text for the css that has h2.title attribute
+       title = browser.find_by_css('h2.title').text
+       
+       hemispheres["img_url"] = img_url
+       hemispheres["title"] = title
+       
+       #Append dictionary to hemisphere_image_
+        hemisphere_image_urls.append(hemispheres)
+        browser.back()
+    return hemisphere_image_urls
